@@ -16,6 +16,8 @@ The design keeps protocol churn minimal. Clients and relays continue to use NIP-
 
 ## Specification / Protocol Flow
 
+Note: This NIP uses "relay" where RFC 9540 uses "gateway." They are equivalent roles.
+
 ### NIP-11 advertisement and OHTTP key configuration
 
 Relays MUST support fetching [RFC 9540 Key Configuration Fetching](https://www.rfc-editor.org/rfc/rfc9540.html#name-key-configuration-fetching) via GET request. RFC 9540 defines the gateway location as `/.well-known/ohttp-gateway`. RFC9540 also defines the key configuration encoding.
@@ -64,7 +66,7 @@ In order to preserve per-request unlinkability, clients MUST use a fresh HPKE en
 
 ### Endpoints
 
-#### Logical, Behind OHTTP
+#### Target endpoints
 
 Clients that receive a `404 Not Found` response SHOULD interpret it as an indication that the relay does not support OHTTP. In this case, clients SHOULD fall back to a standard WebSocket connection if they wish to interact with the relay.
 
@@ -74,7 +76,7 @@ The HTTP body MUST be a binary payload as defined in RFC 9458. The request MUST 
 
 HTTP Responses MUST only include the encapsulated BHTTP response and they MUST return `200 OK` regardless of the inner BHTTP response.
 
-#### Virtual, BHTTP Encapsulated in OHTTP
+#### BHTTP inner requests
 
 After decapsulation, relays parse the inner BHTTP request. Two methods are supported. All responses from these logical endpoints MUST return `200 OK` within the BHTTP layer.
 Relays MUST enforce the request and response size limits advertised in NIP-11. All responses MUST be re-encapsulated and returned to the client.
@@ -94,7 +96,7 @@ The request query parameter MUST contain a single NIP-1 `REQ` subscription filte
 * A filter MUST be included in the query string. // TODO: decide on the encoding and query param
 * The encoding format for this filter (hexified JSON vs. URL-encoded JSON) remains an open question.
 
-### Key rotation
+### Key configuration lifetime
 
 Relays MUST rotate their OHTTP key configurations periodically to limit replay attacks and reduce the impact of key compromise. Key rotation is signaled via the HTTP caching headers (Cache-Control, Expires, ETag) on the response to the key configuration fetch defined in RFC 9540
 
