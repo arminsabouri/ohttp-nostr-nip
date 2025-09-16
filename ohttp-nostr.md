@@ -12,7 +12,7 @@ Nostr today relies on persistent WebSocket connections that inherently expose a 
 
 Oblivious HTTP (OHTTP) provides a standardized way to separate transport metadata from application payloads. By routing requests through an OHTTP relay, clients conceal their network identity from the target relay while preserving end-to-end confidentiality and integrity of their Nostr events. This introduces per-request unlinkability without requiring heavy overlay networks.
 
-The design keeps protocol churn minimal. Clients and relays continue to use NIP-01 semantics, but transport shifts from a connection-oriented WebSocket to stateless OHTTP messages. Deployment is incremental: relays can expose OHTTP endpoints alongside WebSocket interfaces, advertising support in NIP-11. Clients that do not adopt OHTTP remain fully interoperble.
+The design keeps protocol churn minimal. Clients and relays continue to use NIP-01 semantics, but transport shifts from a connection-oriented WebSocket to stateless OHTTP messages. Deployment is incremental: relays can expose OHTTP endpoints alongside WebSocket interfaces, advertising support in NIP-11. Clients that do not adopt OHTTP remain fully interoperable.
 
 ## Specification / Protocol Flow
 
@@ -44,72 +44,81 @@ Relays and clients MUST support the following configurations:
 * Key Derivation Function (KDF): HKDF-SHA256
 * Authenticated Encryption with Associated Data (AEAD): ChaCha20Poly1305
 
-The following configurations we're chosen because most of the clients and relays are already using the same cryptoraphic primitives.
+The following configurations were chosen because most of the clients and relays are already using the same cryptographic primitives.
 
 Relays CAN advertise their key configuration in the NIP-11 document to reduce round trips for the clients.
 
 ### Retrieve key configuration
 
-Clients MUST retrieve the OHTTP [key configuration](https://www.ietf.org/rfc/rfc9458.html#section-3.1) from the relay using RFC 9540 at the `/.well-known/ohttp-gateway` endpoint. This request MUST be authenticated. If the relay advertises the configuration in its NIP-11 document, clients MAY use that as an alternative bootstrap source but doing so may reveal the clients network identity.
+Clients MUST retrieve the OHTTP [key configuration](https://www.ietf.org/rfc/rfc9458.html#section-3.1) from the relay using RFC 9540 at the `/.well-known/ohttp-gateway` endpoint. Clients MUST ensure the key fetching request is secure and authenticated. If the relay advertises the configuration in its NIP-11 document, clients MAY use that as an alternative bootstrap source but doing so may reveal the clients network identity.
 
 The key configuration defines the HPKE parameters required to establish secure and authenticated communication with the target relay. When fetching the configuration, clients SHOULD route the request through an OHTTP relay to avoid exposing their network identity.
 
 Once the configuration is retrieved, the client encapsulates a NIP-1 message inside a Binary HTTP (BHTTP) request and then applies HPKE to form the OHTTP request.
 
 * EVENT messages: Encapsulate as BHTTP `POST`. The body MUST contain the event as a JSON string.
-* REQ messages: Encapsulate as BHTTP `GET`. The query string MUST carry the NIP-1 filter, encoded either as a hexified JSON string or URL-encoded JSON (final encoding is TBD).
+* REQ messages: Encapsulate as BHTTP `GET`. The query string MUST carry the NIP-1 filter, encoded either as a hexified JSON string or URL-encoded JSON (final encoding is TBD). // TODO decide on the encoding // TODO: decide on the query param
 * REQ messages MUST NOT include a subscription ID, as this leaks linkable metadata.
+
+In order to preserve per-request unlinkability, clients MUST use a fresh HPKE encapsulation per request.
 
 ### Long Polling
 
-TODO: 
+TODO:
 
-#### Endpoints (logical, behind OHTTP)
+### Endpoints
 
-Clients SHOULD interpert a 404 response as a relay that does not support OHTTP and SHOULD fallback to a an ordinary WebSocket connection if they wish to use this specific relay. 
+#### Logical, Behind OHTTP
 
-* `POST /ohttp/` -- submit an OHTTP encapsulated event
+Clients that receive a `404 Not Found` response SHOULD interpret it as an indication that the relay does not support OHTTP. In this case, clients SHOULD fall back to a standard WebSocket connection if they wish to interact with the relay.
 
-HTTP bodies MUST be a binary payload per RFC 9458. The HTTP headers MUST include the "Content-Type" header with the value "message/ohttp-req".
-Relays MUST decapsulate to obtain the BHTTP request using their key configuration.
+* `POST /ohttp/` - Submit an OHTTP-encapsulated event.
 
-HTTP responses are:
+The HTTP body MUST be a binary payload as defined in RFC 9458. The request MUST include a `Content-Type` header with the value `message/ohttp-req`. Relays MUST decapsulate the payload using their advertised key configuration to obtain the inner BHTTP request.
 
-* `200 OK` with NDJSON for `req`.
+HTTP Responses MUST only include the encapsulated BHTTP response and they MUST return `200 OK` regardless of the inner BHTTP response.
 
-* `202 Accepted` with server ACK or empty body.
+#### Virtual, BHTTP Encapsulated in OHTTP
 
-Note responses are encapsulated back to the sender.
+After decapsulation, relays parse the inner BHTTP request. Two methods are supported. All responses from these logical endpoints MUST return `200 OK` within the BHTTP layer.
+Relays MUST enforce the request and response size limits advertised in NIP-11. All responses MUST be re-encapsulated and returned to the client.
 
-#### Endpoints (virtual, BHTTP request encapsulated in OHTTP)
+##### `POST`
 
-After decapsulating the logical HTTP request, relays should decapsulate and parse out the BHTTP inner request. There are two valid methods. Responses should also be included in the BHTTP response. All responses back from the logica endpoint should be 200.
+The request body MUST contain a single NIP-1 `EVENT` message.
 
-##### POST
+* If valid, the relay MUST return an empty `202 Accepted` response.
+* If malformed or invalid, the relay MUST return `400 Bad Request`.
+* For server-side errors, the relay MUST return `500 Internal Server Error`.
 
-The body is expected to be a single NIP-1 Event message. An empty 202 response is expected if the event can be processed. 400 if the NIP-1 message is malformed. Or for any other client side errors. 500 must be provided for internal related errors.
+##### `GET`
 
-##### GET
+The request query parameter MUST contain a single NIP-1 `REQ` subscription filter message.
 
-The body is expected to be a single NIP-1 subscription message. A filter is expected to be provided in the query messages. TODO which key (?).
+* A filter MUST be included in the query string. // TODO: decide on the encoding and query param
+* The encoding format for this filter (hexified JSON vs. URL-encoded JSON) remains an open question.
 
-Relays MUST enforce request/response size limits advertised in NIP-11.
+### Key rotation
 
-Responses must be encapsulated back to the sender.
+Relays MUST rotate their OHTTP key configurations periodically to limit replay attacks and reduce the impact of key compromise. Key rotation is signaled via the HTTP caching headers (Cache-Control, Expires, ETag) on the response to the key configuration fetch defined in RFC 9540
 
-#### Key rotation
+#### Backwards Compatibility
 
-// TODO
+Relays continue to support NIP-01 over WebSockets. Clients that do not implement OHTTP interoperate unchanged. The OHTTP interface introduces new endpoints; no changes to NIP-01 message schemas.
 
-## Backwards Compatibility
+#### Event Scope
 
-* Relays continue to support NIP-01 over WebSockets. Clients that do not implement OHTTP interoperate unchanged. The OHTTP interface introduces new endpoints; no changes to NIP-01 message schemas.
+This NIP defines a client–server interaction model and is scoped to the following event types only:
 
-## Privacy Considerations
+* [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md) - Encrypted DMs
+* [NIP-57](https://github.com/nostr-protocol/nips/blob/master/57.md) - Zaps
+* [NIP-59](https://github.com/nostr-protocol/nips/blob/master/59.md) - Gift Wraps
 
-* Per-request unlinkability: Clients MUST use a fresh HPKE encapsulation per request.
+Support for additional NIPs may be defined in future revisions but is out of scope for this specification.
 
-* Gift Wrap: Useful for application-layer metadata minimization, but orthogonal to OHTTP.
+Relays that receive an event outside this scope MUST return a `400 Bad Request` status in the encapsulated BHTTP response.
+
+// TODO: should the supported nips be advertised in the NIP-11?
 
 ## Open Questions
 
@@ -119,7 +128,7 @@ Responses must be encapsulated back to the sender.
 
 * Anonymous credentials: Standardize a NIP for token issuance/redemption to control abuse while preserving unlinkability.
 
-## Reference Implementation(s)
+## Reference Implementation
 
-A client refrence can be found [here](https://github.com/arminsabouri/nostr/blob/ohttp-example/crates/nostr-sdk/examples/ohttp.rs).
+A client reference can be found [here](https://github.com/arminsabouri/nostr/blob/ohttp-example/crates/nostr-sdk/examples/ohttp.rs).
 A nostr relay reference can be found [here](https://github.com/arminsabouri/nostr-rs-relay/tree/ohttp-gateway).
