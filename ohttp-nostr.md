@@ -62,10 +62,6 @@ Once the configuration is retrieved, the client encapsulates a NIP-1 message ins
 
 In order to preserve per-request unlinkability, clients MUST use a fresh HPKE encapsulation per request.
 
-### Long Polling
-
-TODO:
-
 ### Endpoints
 
 #### Logical, Behind OHTTP
