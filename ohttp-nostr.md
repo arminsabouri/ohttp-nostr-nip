@@ -2,9 +2,9 @@
 
 Author: Armin Sabouri <me@arminsabouri.com>
 
-This NIP defines how a Nostr relay can expose an **Oblivious HTTP (OHTTP) target** interface so that clients can send Nostr requests through an **OHTTP relay** without revealing their network identity to the target relay. Each request is encapsulated with an ephemeral HPKE key pair and routed via an OHTTP relay as per RFC 9458. The target relay processes the (decapsulated) request and returns a response; the OHTTP relay cannot read contents, and the target relay cannot see client metadata.
+This NIP defines how a Nostr relay can expose an **Oblivious HTTP (OHTTP) target** interface so that clients can send Nostr requests through an **OHTTP relay** without revealing their network identity to the target relay. Each request is encapsulated with an ephemeral HPKE key pair and routed via an OHTTP relay as per RFC 9458. The target relay processes the (decapsulated) request, decrypts the payload, and returns a response; the OHTTP relay cannot read contents, and the target relay cannot see client metadata.
 
-Critical note: this design relies on **two distinct roles** (OHTTP *relay* and OHTTP *target*). If a single operator controls both and colludes, client unlinkability collapses (a known limitation of OHTTP). See RFC 9458 for the trust split and limitations. ([IETF](https://www.ietf.org/rfc/rfc9458.html), [RFC Editor](https://www.rfc-editor.org/info/rfc9458))
+Critical note: this design relies on two distinct roles (OHTTP *relay* and OHTTP *target*). If a single operator controls both and colludes, client unlinkability collapses (a known limitation of OHTTP). See RFC 9458 for the trust split and limitations. ([IETF](https://www.ietf.org/rfc/rfc9458.html), [RFC Editor](https://www.rfc-editor.org/info/rfc9458))
 
 ## Motivation
 
@@ -56,13 +56,13 @@ Clients MUST retrieve the OHTTP [key configuration](https://www.ietf.org/rfc/rfc
 
 The key configuration defines the HPKE parameters required to establish secure and authenticated communication with the target relay. When fetching the configuration, clients SHOULD route the request through an OHTTP relay to avoid exposing their network identity.
 
-Once the configuration is retrieved, the client encapsulates a NIP-1 message inside a Binary HTTP (BHTTP) request and then applies HPKE to form the OHTTP request.
+Once the configuration is retrieved, the client encapsulates a NIP-1 message inside a Binary HTTP (BHTTP) request and then applies HPKE to form the OHTTP request per RFC 9458.
 
 * EVENT messages: Encapsulate as BHTTP `POST`. The body MUST contain the event as a JSON string.
 * REQ messages: Encapsulate as BHTTP `GET`. The query string MUST carry the NIP-1 filter, encoded either as a hexified JSON string or URL-encoded JSON (final encoding is TBD). // TODO decide on the encoding // TODO: decide on the query param
 * REQ messages MUST NOT include a subscription ID, as this leaks linkable metadata.
 
-In order to preserve per-request unlinkability, clients MUST use a fresh HPKE encapsulation per request.
+In order to preserve per-request unlinkability, clients MUST use a fresh ephemeral HPKE key pair per request. Furthermore, clients MUST NOT re-send the same request to the same relay.
 
 ### Endpoints
 
@@ -78,7 +78,7 @@ HTTP Responses MUST only include the encapsulated BHTTP response and they MUST r
 
 #### BHTTP inner requests
 
-After decapsulation, relays parse the inner BHTTP request. Two methods are supported. All responses from these logical endpoints MUST return `200 OK` within the BHTTP layer.
+After decapsulation, relays parse the inner BHTTP request. Two methods are supported. All responses from the inner BHTTP response MAY include status codes other than `200 OK`.
 Relays MUST enforce the request and response size limits advertised in NIP-11. All responses MUST be re-encapsulated and returned to the client.
 
 ##### `POST`
@@ -86,7 +86,7 @@ Relays MUST enforce the request and response size limits advertised in NIP-11. A
 The request body MUST contain a single NIP-1 `EVENT` message.
 
 * If valid, the relay MUST return an empty `202 Accepted` response.
-* If malformed or invalid, the relay MUST return `400 Bad Request`.
+* If malformed or invalid for any other reason, the relay MUST return `400 Bad Request`.
 * For server-side errors, the relay MUST return `500 Internal Server Error`.
 
 ##### `GET`
@@ -96,7 +96,7 @@ The request query parameter MUST contain a single NIP-1 `REQ` subscription filte
 * A filter MUST be included in the query string. // TODO: decide on the encoding and query param
 * The encoding format for this filter (hexified JSON vs. URL-encoded JSON) remains an open question.
 
-### Key configuration lifetime
+#### Key configuration lifetime
 
 Relays MUST rotate their OHTTP key configurations periodically to limit replay attacks and reduce the impact of key compromise. Key rotation is signaled via the HTTP caching headers (Cache-Control, Expires, ETag) on the response to the key configuration fetch defined in RFC 9540
 
@@ -106,7 +106,7 @@ Relays continue to support NIP-01 over WebSockets. Clients that do not implement
 
 #### Event Scope
 
-This NIP defines a client–server interaction model and is scoped to the following event types only:
+This NIP defines a client-server interaction model and is scoped to the following event types only:
 
 * [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md) - Encrypted DMs
 * [NIP-57](https://github.com/nostr-protocol/nips/blob/master/57.md) - Zaps
@@ -120,11 +120,13 @@ Relays that receive an event outside this scope MUST return a `400 Bad Request` 
 
 ## Open Questions
 
-* Streaming: Whether to standardize a chunked/streaming profile once IETF work stabilizes. ([ietf-wg-ohai.github.io](https://ietf-wg-ohai.github.io/draft-ohai-chunked-ohttp/draft-ietf-ohai-chunked-ohttp.html)). Subscriptions: Avoid long-lived state through OHTTP. Use poll+cursor now; consider chunked OHTTP later when the IETF draft matures
+* Streaming: Whether to standardize a chunked/streaming profile once IETF work stabilizes. ([ietf-wg-ohai.github.io](https://ietf-wg-ohai.github.io/draft-ohai-chunked-ohttp/draft-ietf-ohai-chunked-ohttp.html)). Subscriptions: Avoid long-lived state through OHTTP. Use poll+cursor now; consider chunked OHTTP later when code and standards stabilize.
 
-* Discovery: Whether to mandate RFC 9540 SVCB discovery in addition to NIP-11 fields. ([RFC Editor](https://www.rfc-editor.org/rfc/rfc9540.html))
+* Discovery: Whether to mandate RFC 9540 SVCB discovery in addition to NIP-11 fields. ([RFC Editor](https://www.rfc-editor.org/rfc/rfc9540.html)). This seems foreign to the Nostr protocol. Can't think of a good reason to do this. 
 
 * Anonymous credentials: Standardize a NIP for token issuance/redemption to control abuse while preserving unlinkability.
+
+* PIR ?
 
 ## Reference Implementation
 
