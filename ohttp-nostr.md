@@ -1,7 +1,5 @@
 # NIP-X -- Nostr Relays as OHTTP Targets
 
-Author: Armin Sabouri <me@arminsabouri.com>
-
 This NIP defines how a Nostr relay can expose an **Oblivious HTTP (OHTTP) target** interface so that clients can send Nostr requests through an **OHTTP relay** without revealing their network identity to the target relay. Each request is encapsulated with an ephemeral HPKE key pair and routed via an OHTTP relay as per RFC 9458. The target relay processes the (decapsulated) request, decrypts the payload, and returns a response; the OHTTP relay cannot read contents, and the target relay cannot see client metadata.
 
 Critical note: this design relies on two distinct roles (OHTTP *relay* and OHTTP *target*). If a single operator controls both and colludes, client unlinkability collapses (a known limitation of OHTTP). See RFC 9458 for the trust split and limitations. ([IETF](https://www.ietf.org/rfc/rfc9458.html), [RFC Editor](https://www.rfc-editor.org/info/rfc9458))
