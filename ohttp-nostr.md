@@ -25,10 +25,9 @@ Relays that implement this NIP MUST advertise the following new fields in their 
 ```json
 {  
   "ohttp": {  
-    "keyconfig_endpoint": "https://relay.example.com/.well-known/ohttp-gateway", 
     "max_request_bytes": 65536,  
     "max_response_bytes": 1048576,
-    "keyconfig": "0x....", // TODO: Put a base64 or hex encoded string
+    "keyconfig": "01001604d51a22bc641d1ff95729b815cd036f93d4eff9c76fa3c867000e4e05e1982e849b679050c981b9cea485adb2a2f1cfc905393345cf1364d8456e3aa3abc338da000400010003",
   }
 }
 ```
@@ -40,11 +39,12 @@ Relays and clients MUST at minimum support the following configurations:
 * Authenticated Encryption with Associated Data (AEAD): ChaCha20Poly1305
 
 // TODO: the mac should be the same as the one used in DMs
-// TODO: are nip11 fields signed?
+
+<!-- Note: nip11 is a standard nostr event in of type 2 and is explicitly signed -->
 
 The following configurations were chosen because most of the clients and relays are already using the same cryptographic primitives.
 
-Relays CAN advertise their key configuration in the NIP-11 document to reduce round trips for the clients.
+Relays CAN advertise their key configuration in the NIP-11 document to reduce round trips for the clients. If relays choose to do so, the relay MUST provide a hexified encoding of the key configuration.
 
 ### Retrieve key configuration
 
@@ -89,10 +89,10 @@ The request body MUST contain a single NIP-1 `EVENT` message.
 
 The request query parameter MUST contain a single NIP-1 `REQ` subscription filter message.
 
-* A filter MUST be included in the query string. // TODO: decide on the encoding and query param
+* A filter MUST be included in the query string with the key `filter`. // TODO: decide on the encoding
 * The encoding format for this filter (hexified JSON vs. URL-encoded JSON) remains an open question.
 
-// TODO: describe the response format
+Relays MUST return a `200 OK` response with the inner BHTTP response if the request is valid. The response MUST be formatted as new line delimited JSON.
 
 ### Key configuration lifetime
 
@@ -106,8 +106,6 @@ Relays continue to support NIP-01 over WebSockets. Clients that do not implement
 
 This NIP defines a client-server interaction model and is scoped to the following event types only:
 
-// TODO: what about the other dm nips?
-
 * [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md) - Encrypted DMs
 * [NIP-57](https://github.com/nostr-protocol/nips/blob/master/57.md) - Zaps
 * [NIP-59](https://github.com/nostr-protocol/nips/blob/master/59.md) - Gift Wraps
@@ -116,15 +114,11 @@ Support for additional NIPs may be defined in future revisions but is out of sco
 
 Relays that receive an event outside this scope MUST return a `400 Bad Request` status in the encapsulated BHTTP response.
 
-// TODO: should the supported nips be advertised in the NIP-11?
-
 ## Open Questions
 
 * Streaming: Whether to standardize a chunked/streaming profile once IETF work stabilizes. ([ietf-wg-ohai.github.io](https://ietf-wg-ohai.github.io/draft-ohai-chunked-ohttp/draft-ietf-ohai-chunked-ohttp.html)). Subscriptions: Avoid long-lived state through OHTTP. Use poll+cursor now; consider chunked OHTTP later when code and standards stabilize.
 
-* Denial of service: Standardize a NIP for token issuance/redemption to control abuse while preserving unlinkability.
-
-* PIR ?
+* Denial of service protection: Standardize a NIP for token issuance/redemption to control abuse while preserving unlinkability.
 
 ## Reference Implementation
 
