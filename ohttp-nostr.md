@@ -25,24 +25,22 @@ Relays that implement this NIP MUST advertise the following new fields in their 
 ```json
 {  
   "ohttp": {  
-    "keys": "https://relay.example.com/.well-known/ohttp-gateway", 
-    "suites": { // TODO do we just specify one crypto suite or allow for configuration?
-      "kems": ["X25519-HKDF-SHA256"],  
-      "kdfs": ["HKDF-SHA256"],  
-      "aeads": ["ChaCha20Poly1305"]  
-    },  
+    "keyconfig_endpoint": "https://relay.example.com/.well-known/ohttp-gateway", 
     "max_request_bytes": 65536,  
     "max_response_bytes": 1048576,
-    "keyconfig": "0x....",
-   }  
+    "keyconfig": "0x....", // TODO: Put a base64 or hex encoded string
+  }
 }
 ```
 
-Relays and clients MUST support the following configurations:
+Relays and clients MUST at minimum support the following configurations:
 
-* Key Encapsulation Mechanism (KEM): X25519-HKDF-SHA256
+* Key Encapsulation Mechanism (KEM): Secp256k1-HKDF-SHA256
 * Key Derivation Function (KDF): HKDF-SHA256
 * Authenticated Encryption with Associated Data (AEAD): ChaCha20Poly1305
+
+// TODO: the mac should be the same as the one used in DMs
+// TODO: are nip11 fields signed?
 
 The following configurations were chosen because most of the clients and relays are already using the same cryptographic primitives.
 
@@ -94,17 +92,21 @@ The request query parameter MUST contain a single NIP-1 `REQ` subscription filte
 * A filter MUST be included in the query string. // TODO: decide on the encoding and query param
 * The encoding format for this filter (hexified JSON vs. URL-encoded JSON) remains an open question.
 
-#### Key configuration lifetime
+// TODO: describe the response format
 
-Relays MUST rotate their OHTTP key configurations periodically to limit replay attacks and reduce the impact of key compromise. Key rotation is signaled via the HTTP caching headers (Cache-Control, Expires, ETag) on the response to the key configuration fetch defined in RFC 9540
+### Key configuration lifetime
 
-#### Backwards Compatibility
+Relays MUST rotate their OHTTP key configurations periodically to limit replay attacks and reduce the impact of key compromise. Key rotation is signaled via the HTTP caching headers (Cache-Control, Expires, ETag) on the response to the key configuration fetch defined in RFC 9540.
+
+### Backwards Compatibility
 
 Relays continue to support NIP-01 over WebSockets. Clients that do not implement OHTTP interoperate unchanged. The OHTTP interface introduces new endpoints; no changes to NIP-01 message schemas.
 
-#### Event Scope
+### Event Scope
 
 This NIP defines a client-server interaction model and is scoped to the following event types only:
+
+// TODO: what about the other dm nips?
 
 * [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md) - Encrypted DMs
 * [NIP-57](https://github.com/nostr-protocol/nips/blob/master/57.md) - Zaps
@@ -120,9 +122,7 @@ Relays that receive an event outside this scope MUST return a `400 Bad Request` 
 
 * Streaming: Whether to standardize a chunked/streaming profile once IETF work stabilizes. ([ietf-wg-ohai.github.io](https://ietf-wg-ohai.github.io/draft-ohai-chunked-ohttp/draft-ietf-ohai-chunked-ohttp.html)). Subscriptions: Avoid long-lived state through OHTTP. Use poll+cursor now; consider chunked OHTTP later when code and standards stabilize.
 
-* Discovery: Whether to mandate RFC 9540 SVCB discovery in addition to NIP-11 fields. ([RFC Editor](https://www.rfc-editor.org/rfc/rfc9540.html)). This seems foreign to the Nostr protocol. Can't think of a good reason to do this. 
-
-* Anonymous credentials: Standardize a NIP for token issuance/redemption to control abuse while preserving unlinkability.
+* Denial of service: Standardize a NIP for token issuance/redemption to control abuse while preserving unlinkability.
 
 * PIR ?
 
