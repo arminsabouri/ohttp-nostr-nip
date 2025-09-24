@@ -48,7 +48,7 @@ Relays CAN advertise their key configuration in the NIP-11 document to reduce ro
 
 ### Retrieve key configuration
 
-Clients MUST retrieve the OHTTP [key configuration](https://www.ietf.org/rfc/rfc9458.html#section-3.1) from the relay using RFC 9540 at the `/.well-known/ohttp-gateway` endpoint. Clients MUST ensure the key fetching request is secure and authenticated. If the relay advertises the configuration in its NIP-11 document, clients MAY use that as an alternative bootstrap source but doing so may reveal the clients network identity.
+Clients MUST retrieve the OHTTP [key configuration](https://www.ietf.org/rfc/rfc9458.html#section-3.1) from the relay using RFC 9540 at the `/.well-known/ohttp-gateway` endpoint via a GET request. Clients MUST ensure the key fetching request is secure and authenticated. If the relay advertises the configuration in its NIP-11 document, clients MAY use that as an alternative bootstrap source but doing so may reveal the clients network identity.
 
 The key configuration defines the HPKE parameters required to establish secure and authenticated communication with the target relay. When fetching the configuration, clients SHOULD route the request through an OHTTP relay to avoid exposing their network identity.
 
@@ -66,7 +66,7 @@ In order to preserve per-request unlinkability, clients MUST use a fresh ephemer
 
 Clients that receive a `404 Not Found` response SHOULD interpret it as an indication that the relay does not support OHTTP. In this case, clients SHOULD fall back to a standard WebSocket connection if they wish to interact with the relay.
 
-* `POST /ohttp/` - Submit an OHTTP-encapsulated event.
+* `POST /.well-known/ohttp-gateway` - Submit an OHTTP-encapsulated event.
 
 The HTTP body MUST be a binary payload as defined in RFC 9458. The request MUST include a `Content-Type` header with the value `message/ohttp-req`. Relays MUST decapsulate the payload using their advertised key configuration to obtain the inner BHTTP request.
 
