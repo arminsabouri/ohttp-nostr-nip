@@ -123,4 +123,4 @@ Relays that receive an event outside this scope MUST return a `400 Bad Request` 
 ## Reference Implementation
 
 A client reference can be found [here](https://github.com/arminsabouri/nostr/blob/ohttp-example/crates/nostr-sdk/examples/ohttp.rs).
-A nostr relay reference can be found [here](https://github.com/arminsabouri/nostr-rs-relay/tree/ohttp-gateway).
+A nostr relay reference can be found [here](https://github.com/arminsabouri/nostr-rs-relay/tree/ohttp-target).
