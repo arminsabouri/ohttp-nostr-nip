@@ -2,7 +2,7 @@
 
 This NIP defines how a Nostr relay can expose an **Oblivious HTTP (OHTTP) target** interface so that clients can send Nostr requests through an **OHTTP relay** without revealing their network identity to the target relay. Each request is encapsulated with an ephemeral HPKE key pair and routed via an OHTTP relay as per RFC 9458. The target relay processes the (decapsulated) request, decrypts the payload, and returns a response; the OHTTP relay cannot read contents, and the target relay cannot see client metadata.
 
-Critical note: this design relies on two distinct roles (OHTTP *relay* and OHTTP *target*). If a single operator controls both and colludes, client unlinkability collapses (a known limitation of OHTTP). See RFC 9458 for the trust split and limitations. ([IETF](https://www.ietf.org/rfc/rfc9458.html), [RFC Editor](https://www.rfc-editor.org/info/rfc9458))
+Critical note: this design relies on two distinct roles (OHTTP relay and OHTTP target). If a single operator controls both and colludes, client unlinkability collapses (a known limitation of OHTTP). See RFC 9458 for the trust split and limitations. ([IETF](https://www.ietf.org/rfc/rfc9458.html), [RFC Editor](https://www.rfc-editor.org/info/rfc9458))
 
 ## Motivation
 
@@ -27,6 +27,7 @@ Relays that implement this NIP MUST advertise the following new fields in their 
   "ohttp": {  
     "max_request_bytes": 65536,  
     "max_response_bytes": 1048576,
+    // Key configuration is optional, but if provided, it MUST be a hexified encoding of the key configuration.
     "keyconfig": "01001604d51a22bc641d1ff95729b815cd036f93d4eff9c76fa3c867000e4e05e1982e849b679050c981b9cea485adb2a2f1cfc905393345cf1364d8456e3aa3abc338da000400010003",
   }
 }
@@ -55,8 +56,7 @@ The key configuration defines the HPKE parameters required to establish secure a
 Once the configuration is retrieved, the client encapsulates a NIP-1 message inside a Binary HTTP (BHTTP) request and then applies HPKE to form the OHTTP request per RFC 9458.
 
 * EVENT messages: Encapsulate as BHTTP `POST`. The body MUST contain the event as a JSON string.
-* REQ messages: Encapsulate as BHTTP `GET`. The query string MUST carry the NIP-1 filter, encoded either as a hexified JSON string or URL-encoded JSON (final encoding is TBD). // TODO decide on the encoding // TODO: decide on the query param
-* REQ messages MUST NOT include a subscription ID, as this leaks linkable metadata.
+* REQ messages: Encapsulate as BHTTP `GET`. The query string MUST carry the NIP-1 filter, encoded either as a hexified JSON string or URL-encoded JSON (final encoding is TBD). // TODO decide on the encoding // TODO: decide on the query param. REQ messages MUST NOT include a subscription ID, as this leaks linkable metadata.
 
 In order to preserve per-request unlinkability, clients MUST use a fresh ephemeral HPKE key pair per request. Furthermore, clients MUST NOT re-send the same request to the same relay.
 
@@ -74,8 +74,8 @@ HTTP Responses MUST only include the encapsulated BHTTP response and they MUST r
 
 #### BHTTP inner requests
 
-After decapsulation, relays parse the inner BHTTP request. Two methods are supported. All responses from the inner BHTTP response MAY include status codes other than `200 OK`.
-Relays MUST enforce the request and response size limits advertised in NIP-11. All responses MUST be re-encapsulated and returned to the client.
+After decapsulation, relays parse the inner BHTTP request. Two methods are supported. BHTTP responses MAY include status codes other than `200 OK`.
+Relays MUST enforce the request and response size limits advertised in NIP-11. All responses MUST be re-encapsulated and returned to the client using the client's reply key.
 
 ##### `POST`
 
