@@ -41,7 +41,7 @@ Relays and clients MUST at minimum support the following configurations:
 
 The following configurations were chosen because most of the clients and relays are already using the same cryptographic primitives.
 
-Relays CAN advertise their key configuration in the NIP-11 document to reduce round trips for the clients. If relays choose to do so, the relay MUST provide a hexified encoding of the key configuration.
+Relays MAY advertise their key configuration in the NIP-11 document to reduce round trips for the clients. If relays choose to do so, the relay MUST provide a hexified encoding of the key configuration.
 
 ### Retrieve key configuration
 
@@ -51,10 +51,10 @@ The key configuration defines the HPKE parameters required to establish secure a
 
 Once the configuration is retrieved, the client encapsulates a NIP-1 message inside a Binary HTTP (BHTTP) request and then applies HPKE to form the OHTTP request per RFC 9458.
 
-* EVENT messages: Encapsulate as BHTTP `POST`. The body MUST contain the event as a JSON string.
-* REQ messages: Encapsulate as BHTTP `GET`. The query string MUST carry the NIP-1 filter, encoded either as a hexified JSON string or URL-encoded JSON (final encoding is TBD). // TODO decide on the encoding // TODO: decide on the query param. REQ messages MUST NOT include a subscription ID, as this leaks linkable metadata.
+* EVENT messages:  OHTTP encapsulated `POST` request. The body MUST contain the event as a JSON string.
+* REQ messages: OHTTP encapsulated `GET` request. The query string MUST carry the NIP-1 filter, encoded either as a hexified JSON string or URL-encoded JSON (final encoding is TBD). // TODO decide on the encoding // TODO: decide on the query param. REQ messages MUST NOT include a subscription ID, as this leaks linkable metadata.
 
-In order to preserve per-request unlinkability, clients MUST use a fresh ephemeral HPKE key pair per request. Furthermore, clients MUST NOT re-send the same request to the same relay.
+In order to preserve per-request unlinkability, clients MUST use a fresh ephemeral HPKE key pair per request. Furthermore, clients MUST NOT re-send the same encapsulated request to the same relay.
 
 ### Endpoints
 
@@ -92,7 +92,7 @@ Relays MUST return a `200 OK` response with the inner BHTTP response if the requ
 
 ### Key configuration lifetime
 
-Relays MUST rotate their OHTTP key configurations periodically to limit replay attacks and reduce the impact of key compromise. Key rotation is signaled via the HTTP caching headers (Cache-Control, Expires, ETag) on the response to the key configuration fetch defined in RFC 9540.
+Relays SHOULD rotate their OHTTP key configurations periodically to limit replay attacks and reduce the impact of key compromise. Key rotation is signaled via the HTTP caching headers (Cache-Control, Expires, ETag) on the response to the key configuration fetch defined in RFC 9540.
 
 ### Backwards Compatibility
 
