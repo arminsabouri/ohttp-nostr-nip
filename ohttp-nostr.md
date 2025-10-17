@@ -90,7 +90,7 @@ The request query parameter MUST contain a single NIP-1 `REQ` subscription filte
 * A filter MUST be included in the query string with the key `filter`. // TODO: decide on the encoding
 * The encoding format for this filter (hexified JSON vs. URL-encoded JSON) remains an open question.
 
-Relays MUST return a `200 OK` response with the inner BHTTP response if the request is valid. The response MUST be formatted as new line delimited JSON.
+Relays MUST return a `200 OK` response with the inner BHTTP response if the request is valid. The response MUST be formatted as new line delimited JSON. All available events within the event scope (defined below) MUST be returned in the response.
 
 ### Key configuration lifetime
 
