@@ -16,7 +16,7 @@ The design keeps protocol churn minimal. Clients and relays continue to use NIP-
 
 ## Specification / Protocol Flow
 
-Note: This NIP uses "relay" where RFC 9540 uses "gateway." They are equivalent roles.
+Note: This NIP uses "relay" where RFC 9540 uses "gateway." Relays MAY deploy the OHTTP gateway separately from the OHTTP resource if it suites their setup; however, this NIP and the reference code below assumes the OHTTP gateway is deployed on the same interface as the HTTP interface.
 
 ### NIP-11 advertisement and OHTTP key configuration
 
